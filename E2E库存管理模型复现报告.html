@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>E2E 库存管理模型复现报告</title>
+<script src="https://fastly.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<link rel="preconnect" href="https://miaoda.feishu.cn">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/css2?family=Noto+Serif+SC:wght@400;600;700;900&family=Noto+Sans+SC:wght@300;400;500;700&display=swap">
+<style>
+  :root {
+    --ink: #1a2332;
+    --ink-light: #4a5568;
+    --paper: #fafaf7;
+    --accent: #1e4d7b;
+    --accent-light: #e8f0f8;
+    --border: #e2e8f0;
+    --positive: #2d6a4f;
+    --negative: #9b2226;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Noto Sans SC', -apple-system, sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    line-height: 1.7;
+    font-size: 15px;
+  }
+  .container { max-width: 960px; margin: 0 auto; padding: 40px 24px; }
+
+  /* Hero */
+  .hero {
+    border-left: 4px solid var(--accent);
+    padding: 24px 32px;
+    background: white;
+    margin-bottom: 48px;
+  }
+  .hero .label {
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+    margin-bottom: 12px;
+  }
+  .hero h1 {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 28px;
+    font-weight: 700;
+    line-height: 1.3;
+    margin-bottom: 16px;
+    color: var(--ink);
+  }
+  .hero .meta {
+    font-size: 13px;
+    color: var(--ink-light);
+  }
+  .hero .meta span { margin-right: 16px; }
+
+  /* Section */
+  .section { margin-bottom: 48px; }
+  .section h2 {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 20px;
+    font-weight: 700;
+    margin-bottom: 20px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+    color: var(--ink);
+  }
+  .section h3 {
+    font-size: 16px;
+    font-weight: 600;
+    margin: 24px 0 12px;
+    color: var(--accent);
+  }
+  .section p { margin-bottom: 12px; }
+
+  /* Contribution cards */
+  .contrib-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin: 20px 0;
+  }
+  .contrib-card {
+    background: white;
+    border: 1px solid var(--border);
+    padding: 20px;
+  }
+  .contrib-card .num {
+    font-family: 'Noto Serif SC', serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 8px;
+  }
+  .contrib-card .title {
+    font-weight: 600;
+    margin-bottom: 8px;
+    font-size: 14px;
+  }
+  .contrib-card .desc {
+    font-size: 13px;
+    color: var(--ink-light);
+    line-height: 1.6;
+  }
+
+  /* Architecture diagram */
+  .arch-diagram {
+    background: white;
+    border: 1px solid var(--border);
+    padding: 32px;
+    margin: 20px 0;
+  }
+  .arch-row {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    margin-bottom: 16px;
+    align-items: center;
+  }
+  .arch-box {
+    padding: 10px 20px;
+    font-size: 13px;
+    font-weight: 500;
+    text-align: center;
+    min-width: 120px;
+  }
+  .arch-input { background: #dbeafe; border: 1px solid #93c5fd; }
+  .arch-sub { background: #d1fae5; border: 1px solid #6ee7b7; }
+  .arch-hidden { background: #fef3c7; border: 1px solid #fcd34d; }
+  .arch-output { background: #fee2e2; border: 1px solid #fca5a5; }
+  .arch-arrow {
+    font-size: 20px;
+    color: var(--ink-light);
+  }
+
+  /* Table */
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    margin: 16px 0;
+    font-size: 14px;
+  }
+  .data-table th {
+    background: var(--accent);
+    color: white;
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 500;
+    font-size: 13px;
+  }
+  .data-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .data-table tr:hover td { background: var(--accent-light); }
+  .data-table .highlight { background: #f0f7ff; font-weight: 600; }
+  .pct-better { color: var(--positive); font-weight: 500; }
+  .pct-worse { color: var(--negative); }
+
+  /* Chart container */
+  .chart-box {
+    background: white;
+    border: 1px solid var(--border);
+    padding: 20px;
+    margin: 20px 0;
+  }
+  .chart-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 12px;
+    color: var(--ink);
+  }
+  #costChart { width: 100%; height: 360px; }
+  #fieldChart { width: 100%; height: 320px; }
+
+  /* Formula */
+  .formula {
+    background: #f8f9fa;
+    border-left: 3px solid var(--accent);
+    padding: 16px 20px;
+    margin: 16px 0;
+    font-family: 'Georgia', serif;
+    font-size: 14px;
+    overflow-x: auto;
+  }
+
+  /* Code structure */
+  .code-tree {
+    background: #1e293b;
+    color: #e2e8f0;
+    padding: 24px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 1.8;
+    margin: 16px 0;
+    overflow-x: auto;
+  }
+  .code-tree .dir { color: #60a5fa; }
+  .code-tree .file { color: #e2e8f0; }
+  .code-tree .comment { color: #94a3b8; }
+
+  /* Footer */
+  .footer {
+    margin-top: 64px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--ink-light);
+    text-align: center;
+  }
+
+  /* Responsive */
+  @media (max-width: 640px) {
+    .container { padding: 20px 16px; }
+    .hero h1 { font-size: 22px; }
+    .contrib-grid { grid-template-columns: 1fr; }
+    .arch-row { flex-direction: column; gap: 8px; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="label">论文复现报告</div>
+    <h1>A Practical End-to-End Inventory Management Model with Deep Learning</h1>
+    <div class="meta">
+      <span>Qi, M., Shi, Y., Qi, Y., Ma, C., Yuan, R., Wu, D., & Shen, Z. J. M. (2023)</span>
+      <span>Management Science, 69(2), 759–773</span>
+    </div>
+  </div>
+
+  <!-- 1. 核心贡献 -->
+  <div class="section">
+    <h2>一、论文核心贡献</h2>
+    <p>传统库存管理采用 <strong>PTO (Predict-Then-Optimize)</strong> 两步法：先预测需求和供应商提前期 (VLT)，再输入优化模型求解订货量。本文提出 <strong>E2E (End-to-End)</strong> 框架，训练一个神经网络直接从输入特征输出最优补货决策，跳过中间优化步骤。</p>
+
+    <div class="contrib-grid">
+      <div class="contrib-card">
+        <div class="num">01</div>
+        <div class="title">首个 E2E 库存补货框架</div>
+        <div class="desc">基于标签方法，神经网络直接从输入特征输出最优订货量，取代分步预测+优化的传统范式。</div>
+      </div>
+      <div class="contrib-card">
+        <div class="num">02</div>
+        <div class="title">自动决策策略学习</div>
+        <div class="desc">自动学习不同需求模式下的最优库存策略，涵盖多种批量补货模型，超越行业领先零售商。</div>
+      </div>
+      <div class="contrib-card">
+        <div class="num">03</div>
+        <div class="title">解耦式深度网络设计</div>
+        <div class="desc">需求预测和 VLT 预测分别用独立子网络，大幅降低计算复杂度和参数量，同时保持高性能。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 2. 模型架构 -->
+  <div class="section">
+    <h2>二、E2E 模型架构</h2>
+    <p>模型由两个解耦子模块 + 融合层组成，对应论文 Figure 1：</p>
+
+    <div class="arch-diagram">
+      <div class="arch-row">
+        <div class="arch-box arch-input">Input_DF<br><small>历史需求序列</small></div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-box arch-sub">DF_submodule<br><small>MQRNN 多分位数RNN</small></div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-box arch-hidden" rowspan="2">Layer_3<br><small>融合隐藏层 100维</small></div>
+      </div>
+      <div class="arch-row">
+        <div class="arch-box arch-input">Input_VLT<br><small>VLT历史统计</small></div>
+        <div class="arch-arrow">→</div>
+        <div class="arch-box arch-sub">VLT_layer_1 → VLT_layer_2<br><small>2层前馈网络</small></div>
+      </div>
+      <div class="arch-row">
+        <div class="arch-box arch-input">Input_basic<br><small>review period, initial stock,<br>品类/位置/品牌 embedding</small></div>
+        <div class="arch-arrow">→</div>
+        <div style="color: var(--ink-light); font-size: 13px;">直接进入融合层</div>
+      </div>
+      <div class="arch-row" style="margin-top: 20px;">
+        <div class="arch-box arch-hidden">Layer_4<br><small>融合隐藏层 100维</small></div>
+      </div>
+      <div class="arch-row" style="margin-top: 12px;">
+        <div class="arch-box arch-output">Out 1: 最优订货量 a*<br><small>(主输出)</small></div>
+        <div class="arch-box arch-output">Out 2: 需求预测 d*<br><small>(辅助正则)</small></div>
+        <div class="arch-box arch-output">Out 3: VLT预测 v*<br><small>(辅助正则)</small></div>
+      </div>
+    </div>
+
+    <h3>训练损失函数 (公式 6)</h3>
+    <div class="formula">
+      min<sub>θ</sub> Σ<sub>i=1..N</sub> [ L(Out1<sub>i</sub>, a*<sub>i</sub>) + λ<sub>1</sub>·L<sub>1</sub>(Out2<sub>i</sub>, d<sup>DF</sup><sub>i</sub>) + λ<sub>2</sub>·L<sub>2</sub>(Out3<sub>i</sub>, d<sup>VLT</sup><sub>i</sub>) ]
+    </div>
+    <p>主损失监督最优订货量，两个辅助损失分别监督需求和 VLT 预测，帮助子模块更快收敛。</p>
+
+    <h3>最优标签生成 (Theorem 1)</h3>
+    <p>通过动态规划后向归纳求解最优订货量 a*，作为监督学习的标签。核心结论：</p>
+    <div class="formula">
+      a*<sub>m</sub> = max( s*<sub>[m,n]</sub> − I<sub>t<sub>m</sub></sub>, 0 )<br>
+      s*<sub>[m,n]</sub> = [ b·μ<sub>[m,n]</sub> ] / (b + h)
+    </div>
+  </div>
+
+  <!-- 3. 离线实验结果 -->
+  <div class="section">
+    <h2>三、离线数值实验结果</h2>
+    <p>基于 JD.com 真实数据，24,333 个 SKU，训练集 70%，验证集 20%，测试集 30 天。</p>
+
+    <div class="chart-box">
+      <div class="chart-title">图 1：各方法平均库存成本对比（复现论文 Figure 2 右）</div>
+      <div id="costChart"></div>
+    </div>
+
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>方法</th>
+          <th>总成本</th>
+          <th>持有成本</th>
+          <th>缺货成本</th>
+          <th>相对 OPT 差异</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="highlight">
+          <td>OPT (最优标签)</td>
+          <td>3,022.60</td>
+          <td>1,925.70</td>
+          <td>1,096.91</td>
+          <td>—</td>
+        </tr>
+        <tr>
+          <td><strong>E2E_RNN</strong></td>
+          <td>3,766.52</td>
+          <td>2,689.02</td>
+          <td>1,077.50</td>
+          <td class="pct-better">+24.6%</td>
+        </tr>
+        <tr>
+          <td>BM1 (MQRNN + newsvendor)</td>
+          <td>4,207.09</td>
+          <td>2,502.55</td>
+          <td>1,704.54</td>
+          <td class="pct-worse">+39.2%</td>
+        </tr>
+        <tr>
+          <td>BM2 (arrival-aware PTO)</td>
+          <td>4,157.03</td>
+          <td>2,254.99</td>
+          <td>1,902.04</td>
+          <td class="pct-worse">+37.5%</td>
+        </tr>
+        <tr>
+          <td>Normal base stock</td>
+          <td>4,576.05</td>
+          <td>3,369.21</td>
+          <td>1,206.84</td>
+          <td class="pct-worse">+51.4%</td>
+        </tr>
+        <tr>
+          <td>Gamma base stock</td>
+          <td>4,476.17</td>
+          <td>2,821.87</td>
+          <td>1,654.30</td>
+          <td class="pct-worse">+48.1%</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p><strong>关键发现：</strong>E2E_RNN 比最优 Oracle 仅高 24.6%，而两个 PTO 基准 (BM1/BM2) 高出 37-39%，静态 base stock 高出 48-51%。E2E 框架比两步法减少约 13% 的成本差距。</p>
+  </div>
+
+  <!-- 4. 实地实验 -->
+  <div class="section">
+    <h2>四、JD.com 实地实验结果</h2>
+    <p>2020年3月30日–4月30日，12个配送中心，9,308个 SKU，共61,430笔订单。处理组采用 E2E 算法，对照组沿用 JD 当前算法。</p>
+
+    <div class="chart-box">
+      <div class="chart-title">图 2：处理组 vs 对照组五项核心指标差异</div>
+      <div id="fieldChart"></div>
+    </div>
+
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>指标</th>
+          <th>处理组 (E2E)</th>
+          <th>对照组 (JD现行)</th>
+          <th>差异</th>
+          <th>变化幅度</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>持有成本</td>
+          <td>598.20</td>
+          <td>809.54</td>
+          <td>−211.34</td>
+          <td class="pct-better">−26.1%</td>
+        </tr>
+        <tr>
+          <td>缺货成本</td>
+          <td>496.34</td>
+          <td>1,027.93</td>
+          <td>−531.59</td>
+          <td class="pct-better">−51.7%</td>
+        </tr>
+        <tr>
+          <td>总成本</td>
+          <td>1,094.54</td>
+          <td>1,837.47</td>
+          <td>−742.93</td>
+          <td class="pct-better">−40.4%</td>
+        </tr>
+        <tr>
+          <td>周转率</td>
+          <td>18.59</td>
+          <td>20.39</td>
+          <td>−1.80</td>
+          <td class="pct-better">−8.8%</td>
+        </tr>
+        <tr>
+          <td>缺货率</td>
+          <td>0.17</td>
+          <td>0.26</td>
+          <td>−0.09</td>
+          <td class="pct-better">−34.6%</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <p>所有指标 t 检验 p < 0.001，统计显著。E2E 算法在真实生产环境中全面优于 JD 现行补货系统。</p>
+
+    <h3>DID 双重差分估计</h3>
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>指标</th>
+          <th>处理组变化</th>
+          <th>对照组变化</th>
+          <th>DID 估计</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>持有成本</td><td>−89.93</td><td>+22.86</td><td>−112.79</td></tr>
+        <tr><td>缺货成本</td><td>−384.16</td><td>+140.29</td><td>−524.45</td></tr>
+        <tr><td>总成本</td><td>−474.09</td><td>+163.15</td><td>−637.24</td></tr>
+        <tr><td>周转率</td><td>+2.18</td><td>+3.99</td><td>−1.81</td></tr>
+        <tr><td>缺货率</td><td>−0.07</td><td>+0.04</td><td>−0.11</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 5. 复现代码结构 -->
+  <div class="section">
+    <h2>五、复现代码结构</h2>
+    <p>完整 PyTorch 复现代码已实现，目录结构如下：</p>
+    <div class="code-tree">
+<span class="dir">e2e_inventory/</span>
+├── <span class="file">main.py</span>
+│   <span class="comment"># 一键运行入口：生成数据 → 训练 → 评估 → 输出对比表</span>
+│   <span class="comment"># 调用 train_e2e() 和 evaluate_all_methods() 完成全流程</span>
+│
+├── <span class="file">train.py</span>
+│   <span class="comment"># E2E 模型完整训练脚本</span>
+│   <span class="comment"># Step 1: generate_sku_dataset() 生成合成SKU数据</span>
+│   <span class="comment"># Step 2: generate_all_labels() 用动态规划生成最优标签</span>
+│   <span class="comment"># Step 3: 划分 train/val/test 数据集</span>
+│   <span class="comment"># Step 4: 初始化 E2EInventoryModel 并训练</span>
+│   <span class="comment"># Step 5: 保存最佳验证集模型到 checkpoints/</span>
+│
+├── <span class="file">evaluate.py</span>
+│   <span class="comment"># 评估所有方法并输出对比结果表</span>
+│   <span class="comment"># 运行 OPT / E2E / BM1 / BM2 / Normal / Gamma 六种方法</span>
+│   <span class="comment"># 计算指标：总成本、持有成本、缺货成本、周转率、缺货率</span>
+│   <span class="comment"># 输出论文 Figure 2 风格的对比表格</span>
+│
+├── <span class="file">README.md</span>
+│   <span class="comment"># 项目说明文档：复现内容、运行方式、超参数表、与论文差异说明</span>
+│
+├── <span class="dir">data/</span>
+│   └── <span class="file">synthetic_data.py</span>
+│       <span class="comment"># 合成数据生成器，模拟 JD.com 真实数据结构</span>
+│       <span class="comment"># generate_demand_series(): 生成带趋势/周季节性/噪声的日需求序列</span>
+│       <span class="comment"># generate_vlt_series(): 生成供应商提前期(VLT)序列</span>
+│       <span class="comment"># generate_sku_dataset(): 批量生成多SKU数据集</span>
+│       <span class="comment"># E2EInventoryDataset(): PyTorch Dataset 封装</span>
+│
+├── <span class="dir">labeling/</span>
+│   └── <span class="file">optimal_label.py</span>
+│       <span class="comment"># Theorem 1 最优订货量标签生成</span>
+│       <span class="comment"># compute_optimal_label_single_review(): 单SKU标签计算</span>
+│       <span class="comment">#   输入：未来需求序列、VLT序列、初始库存、review周期</span>
+│       <span class="comment">#   输出：a* (最优订货量)、d* (需求预测标签)、vlt* (VLT预测标签)</span>
+│       <span class="comment"># generate_all_labels(): 批量生成整个数据集的标签</span>
+│
+├── <span class="dir">models/</span>
+│   ├── <span class="file">mqrnn.py</span>
+│   │   <span class="comment"># MQRNN 多分位数RNN需求预测模块</span>
+│   │   <span class="comment"># MQRNN 类: RNN编码器 + 分位数输出头</span>
+│   │   <span class="comment">#   输入: 历史需求序列 (batch, seq_len, 1)</span>
+│   │   <span class="comment">#   输出: 6个分位数预测 + RNN隐状态</span>
+│   │   <span class="comment"># VLTSubnetwork 类: VLT预测子网络 (2层前馈)</span>
+│   │   <span class="comment">#   输入: VLT历史统计特征 (均值/标准差/最值/最近值)</span>
+│   │   <span class="comment">#   输出: VLT预测值 + 隐表示</span>
+│   │
+│   └── <span class="file">e2e_model.py</span>
+│       <span class="comment"># 完整 E2E 端到端库存管理模型 (对应论文 Figure 1)</span>
+│       <span class="comment"># E2EInventoryModel 类: 整合所有子模块</span>
+│       <span class="comment">#   输入: 需求历史序列 + VLT统计特征 + 基本特征 + 类别embedding</span>
+│       <span class="comment">#   输出: Out1=最优订货量, Out2=需求预测, Out3=VLT预测</span>
+│       <span class="comment"># E2ELoss 类: 论文公式(6)的损失函数</span>
+│       <span class="comment">#   L = L_main(a*) + λ1·L1(d*) + λ2·L2(vlt*)</span>
+│
+├── <span class="dir">benchmarks/</span>
+│   ├── <span class="file">base_stock.py</span>
+│   │   <span class="comment"># 静态 base stock 基准方法</span>
+│   │   <span class="comment"># normal_base_stock(): 正态分布 base stock (论文公式7)</span>
+│   │   <span class="comment"># gamma_base_stock(): Gamma分布 base stock (论文公式8)</span>
+│   │   <span class="comment"># compute_order_qty(): 给定base stock和库存算订货量</span>
+│   │
+│   └── <span class="file">bm1_bm2.py</span>
+│       <span class="comment"># PTO (Predict-Then-Optimize) 基准方法</span>
+│       <span class="comment"># bm1_newsvendor_optimize(): BM1 报童优化 (论文公式9)</span>
+│       <span class="comment"># bm2_arrival_aware_optimize(): BM2 考虑VLT的多阶段优化 (论文公式10)</span>
+│       <span class="comment"># run_benchmarks_on_dataset(): 在整个数据集上跑所有基准</span>
+│
+└── <span class="dir">utils/</span>
+    └── <span class="file">cost.py</span>
+        <span class="comment"># 库存成本计算工具函数</span>
+        <span class="comment"># total_period_cost(): 单周期持有+缺货成本 (论文公式2)</span>
+        <span class="comment"># simulate_replenishment(): 模拟整个补货周期的库存过程</span>
+        <span class="comment"># critical_ratio(): 报童临界比 b/(b+h)</span>
+    </div>
+
+    <h3>关键超参数（论文 Table B.1）</h3>
+    <table class="data-table">
+      <thead>
+        <tr><th>超参数</th><th>默认值</th><th>搜索范围</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>MQRNN hidden size</td><td>50</td><td>[30, 40, 50, 60]</td></tr>
+        <tr><td>VLT layer sizes</td><td>[100, 20]</td><td>[50,20], [30,20]</td></tr>
+        <tr><td>Integration layers</td><td>[100, 100]</td><td>[100,100], [100,100,100]</td></tr>
+        <tr><td>Learning rate</td><td>0.001</td><td>[0.0001, 0.001, 0.01]</td></tr>
+        <tr><td>Batch size</td><td>64</td><td>[64, 128, 256]</td></tr>
+        <tr><td>Dropout</td><td>0.2</td><td>[0.1, 0.2, 0.3, 0.4]</td></tr>
+        <tr><td>Activation</td><td>ReLU</td><td>ReLU, tanh</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="footer">
+    复现基于 Qi et al. (2023) Management Science 论文原文数据 | 代码框架 PyTorch
+  </div>
+
+</div>
+
+<script>
+// 成本对比柱状图
+var costChart = echarts.init(document.getElementById('costChart'));
+costChart.setOption({
+  tooltip: { trigger: 'axis' },
+  legend: { data: ['持有成本', '缺货成本'], bottom: 0 },
+  grid: { left: 60, right: 20, top: 20, bottom: 50 },
+  xAxis: {
+    type: 'category',
+    data: ['OPT', 'E2E_RNN', 'BM1', 'BM2', 'Normal', 'Gamma'],
+    axisLabel: { fontSize: 12 }
+  },
+  yAxis: { type: 'value', name: '平均成本' },
+  series: [
+    {
+      name: '持有成本',
+      type: 'bar',
+      stack: 'cost',
+      data: [1925.70, 2689.02, 2502.55, 2254.99, 3369.21, 2821.87],
+      itemStyle: { color: '#4a90d9' }
+    },
+    {
+      name: '缺货成本',
+      type: 'bar',
+      stack: 'cost',
+      data: [1096.91, 1077.50, 1704.54, 1902.04, 1206.84, 1654.30],
+      itemStyle: { color: '#d97757' }
+    }
+  ]
+});
+
+// 实地实验对比图
+var fieldChart = echarts.init(document.getElementById('fieldChart'));
+fieldChart.setOption({
+  tooltip: { trigger: 'axis' },
+  legend: { data: ['处理组 (E2E)', '对照组 (JD现行)'], bottom: 0 },
+  grid: { left: 60, right: 20, top: 20, bottom: 50 },
+  xAxis: {
+    type: 'category',
+    data: ['持有成本', '缺货成本', '总成本'],
+    axisLabel: { fontSize: 12 }
+  },
+  yAxis: { type: 'value', name: '成本' },
+  series: [
+    {
+      name: '处理组 (E2E)',
+      type: 'bar',
+      data: [598.20, 496.34, 1094.54],
+      itemStyle: { color: '#2d6a4f' }
+    },
+    {
+      name: '对照组 (JD现行)',
+      type: 'bar',
+      data: [809.54, 1027.93, 1837.47],
+      itemStyle: { color: '#adb5bd' }
+    }
+  ]
+});
+
+window.addEventListener('resize', function() {
+  costChart.resize();
+  fieldChart.resize();
+});
+</script>
+</body>
+</html>
+<!-- （注：内容由AI生成） -->
